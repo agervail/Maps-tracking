@@ -10,6 +10,7 @@ io.set('transports', ['xhr-polling', 'jsonp-polling']);
 //variables
 var pos = [25.3,22.1];
 var tracks = [];
+var ids = [];
 var trackOn = false;
 
 app.get('/', function (req, res) {
@@ -31,10 +32,13 @@ app.get('/path.js', function (req, res) {
 
 
 app.get('/new_pos', function (req, res) {
-
   lat = parseFloat(req.param('lat'));
   lng = parseFloat(req.param('lng'));
   pos = [lat, lng]
+  id = req.param('id');
+  if(ids.indexOf(id) == -1){
+    ids.push(id);
+  }
   res.send('truc ' + lat)
   var date = new Date();
   console.log('last pos update = ' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds()
@@ -57,6 +61,7 @@ app.get('/new_pos', function (req, res) {
 app.get('/new_track', function(req, res){
   startLat = parseFloat(req.param('lat'));
   startLng = parseFloat(req.param('lng'));
+  pos = [startLat, startLng]
   id = req.param('id');
   tracks[id] = [[startLat, startLng]];
   trackOn = id;
@@ -65,7 +70,16 @@ app.get('/new_track', function(req, res){
     if (err) throw err;
     console.log('new track');
   });
-  res.send('new_track')
+  res.send('new_track');
+});
+
+app.get('/end_track', function(req, res){
+  trackOn = false;
+  res.send('end_track');
+  fs.writeFile('path.js', "path=[];",function (err) {
+    if (err) throw err;
+    console.log('new track');
+  });
 });
 
 
@@ -81,24 +95,19 @@ io.sockets.on('connection', function (socket) {
     ok_init = true;
     socket.emit('news', { lat: pos[0], lng: pos[1] });
   });
-  /*socket.on('truc', function (data) {
-    console.log('truc' + data['my']);
-    console.log(data)
-    client = data['my'];
-    ok_init = true;
-    socket.emit('news', { lat: pos[0], lng: pos[1] });
-  });*/
   var interID = setInterval(function(){
     if(ok_init){
-      socket.emit('news_track', { lat: pos[0], lng: pos[1] });
+      if(trackOn != false){
+        socket.emit('news_track', { lat: pos[0], lng: pos[1], id: ids[0] });
+      } else {
+        socket.emit('news', { lat: pos[0], lng: pos[1], id: ids[0] });
+      }
       console.log('position sent to ' + client);
     }
-  }, 5 * 1000);
+  }, 2 * 1000);
 
   socket.on('disconnect', function(){
     console.log('client ' + client + ' disconnected');
     clearInterval(interID);
   });
-
-
 });
